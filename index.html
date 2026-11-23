@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Suivi des alternances</title>
+<style>
+/* VOICE: nostalgique et joyeux, mais c'est un vrai outil de travail du quotidien
+   IDEA: une fenêtre d'application de bureau des années 2000 — barre de titre bleue, boutons beiges en relief, vue liste
+   PICTURE: la fenêtre elle-même, posée sur un bureau bleu ciel, avec la barre de progression segmentée et la liste éditable
+   COLOUR and TYPE: bleu titre #0054e3, beige #ece9d8, bordures #7f9db9, accents vert/orange ; Tahoma/Verdana
+   LAYOUT: bureau plein écran, une fenêtre centrée ≤1240px, barre d'outils, groupe Avancement, liste, barre d'état */
+:root{color-scheme:light;
+--desk:linear-gradient(170deg,#3a80e0 0%,#5ea2f0 45%,#8cc4f4 100%);
+--face:#ece9d8;--ink:#000;--mute:#5a5a5a;--edge:#7f9db9;--line:#e2e1d6;--field:#fff;--soft:#f4f3ee;
+--sel:#316ac5;--red:#d8261b;--blue:#2262d8;--amber:#e8a000;--teal:#8a3cc8;--green:#2c9a1e;--grey:#8c8c8c}
+:root[data-theme=dark]{--desk:linear-gradient(170deg,#0b1c3d 0%,#14315f 55%,#1f467e 100%)}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--desk:linear-gradient(170deg,#0b1c3d 0%,#14315f 55%,#1f467e 100%)}}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;min-height:100vh;background:var(--desk) fixed;color:var(--ink);font:14px/1.45 Tahoma,Verdana,"Segoe UI",sans-serif;overflow-x:clip;padding:clamp(12px,3vw,40px) max(3vw,8px)}
+.win{max-width:1240px;margin:0 auto;background:var(--face);border:3px solid #0831d9;border-top:0;border-radius:9px 9px 0 0;box-shadow:0 14px 40px rgb(0 0 30 / .45)}
+.tb{display:flex;align-items:center;gap:8px;height:34px;padding:0 4px 0 8px;border-radius:8px 8px 0 0;color:#fff;
+ background:linear-gradient(#0997ff,#0053ee 8%,#0050ee 40%,#0066ff 88%,#0066ff 93%,#005bff 95%,#003dd7 96%,#003dd7);margin:0 -3px;border:1px solid #0831d9;border-bottom:0}
+.tb svg{flex:none}
+.tb input{flex:1;font:700 15px Tahoma,Verdana,sans-serif;color:#fff;background:none;border:0;padding:4px 2px;text-shadow:1px 1px #0f1089;border-radius:2px}
+.tb input:focus{outline:1px dotted #fff;background:rgb(255 255 255 / .12)}
+.ctl{display:flex;gap:2px;flex:none}
+.ctl span{width:22px;height:22px;border:1px solid #fff;border-radius:3px;display:grid;place-items:center;font:700 13px/1 Tahoma,sans-serif;color:#fff;
+ background:radial-gradient(circle at 70% 85%,#2a65e8,#3b80f4 60%,#5a9cff);box-shadow:inset -1px -1px #1745b8}
+.ctl span.x{background:radial-gradient(circle at 70% 85%,#c0310f,#e1552b 60%,#f08b6a)}
+h1{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+/* barre d'outils */
+.tools{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:7px 8px;border-bottom:1px solid #d6d2c2;background:linear-gradient(#f9f8f3,#ece9d8)}
+.tools .grow{flex:1 1 220px;display:flex;align-items:center;gap:6px}
+.tools label{color:var(--mute);font-size:13px;white-space:nowrap}
+input[type=search]{font:inherit;height:30px;padding:0 8px;border:1px solid var(--edge);background:#fff;color:#000;width:100%;border-radius:0}
+.btn{font:inherit;font-size:13px;height:30px;padding:0 12px;border:1px solid #003c74;border-radius:3px;color:#000;cursor:pointer;white-space:nowrap;
+ background:linear-gradient(#fff,#f3f2ec 50%,#ecebe6 86%,#d6d0c5);display:inline-flex;align-items:center;gap:6px}
+.btn:hover{box-shadow:inset 0 -2px #f8b330,inset 0 2px #fde29a,inset 2px 0 #fbd27b,inset -2px 0 #fbd27b}
+.btn:active{background:linear-gradient(#e5e4de,#e3e2da 15%,#f2f1ec)}
+.btn.main{font-weight:700}
+.btn .i{width:16px;height:16px;flex:none}
+:focus-visible{outline:1px dotted #000;outline-offset:-4px}
+.body{padding:12px}
+/* groupe avancement */
+fieldset{border:1px solid #d0d0bf;border-radius:4px;margin:0 0 12px;padding:8px 12px 10px;background:var(--face)}
+legend{color:#0046d5;padding:0 4px}
+.track{display:flex;height:20px;border:1px solid #686868;border-radius:3px;padding:2px;background:#fff;overflow:hidden;gap:0}
+.track span{height:100%;transition:width .4s ease;position:relative;
+ background-image:linear-gradient(rgb(255 255 255 / .55),rgb(255 255 255 / 0) 45%,rgb(0 0 0 / .08)),repeating-linear-gradient(90deg,transparent 0 8px,#fff 8px 10px)}
+.legend{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center}
+.legend button{font:inherit;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;height:28px;padding:0 9px;border:1px solid transparent;border-radius:3px;background:none;color:#000}
+.legend button:hover{border-color:#cecebe;background:#fff}
+.legend button[aria-pressed=true]{border-color:var(--sel);background:#dbe6f8}
+.legend i{width:12px;height:12px;border-radius:2px;background:currentColor;box-shadow:inset 0 0 0 1px rgb(0 0 0 / .25),inset 0 4px rgb(255 255 255 / .35)}
+.legend b{font-weight:700;margin-left:2px}
+.pct{margin-left:auto;font-weight:700;font-size:13px}
+/* vue liste */
+.scroll{overflow-x:auto;border:1px solid var(--edge);background:#fff}
+table{border-collapse:collapse;width:100%;min-width:1180px;font-size:13px}
+th,td{padding:0;text-align:left;vertical-align:middle}
+td{border-bottom:1px solid #f0efe8;border-right:1px solid #f4f3ee}
+th{background:linear-gradient(#fff,#f4f3ee 80%,#ebeadb);border-right:1px solid #d6d2c2;border-bottom:3px solid #e3e2da;font-weight:400}
+th:hover{border-bottom-color:#f9b13f}
+.hd{display:flex;align-items:center}
+.hd input{all:unset;flex:1;padding:6px 8px;font-size:13px;color:#000;cursor:text}
+.hd button,.rowdel,.sorter{all:unset;cursor:pointer;width:26px;height:28px;display:grid;place-items:center;color:#666;border-radius:2px;flex:none;font-size:12px}
+.hd button:hover,.sorter:hover{color:#000;background:#e3e2da}
+.rowdel{color:#b02a10;font-weight:700}.rowdel:hover{background:#fde2dc}
+.sorter.on{color:var(--sel)}
+tbody tr:hover td{background:#eef3fc}
+tbody tr:focus-within td{background:#dbe6f8}
+td input,td select,td textarea{font:inherit;font-size:13px;color:#000;background:none;border:0;width:100%;min-height:34px;padding:6px 8px;border-radius:0}
+td textarea{resize:vertical;display:block;line-height:1.35}
+td input:focus,td select:focus,td textarea:focus{outline:1px solid var(--sel);outline-offset:-1px;background:#fff}
+td input[type=number]{text-align:right;font-variant-numeric:tabular-nums}
+td input[type=checkbox]{width:15px;height:15px;min-height:0;margin:9px;accent-color:var(--green)}
+td.st{width:150px}
+td.st select{padding-left:26px;appearance:none;cursor:pointer;background:linear-gradient(rgb(255 255 255 / .45),transparent) 9px 50%/11px 11px no-repeat,linear-gradient(var(--c),var(--c)) 9px 50%/11px 11px no-repeat}
+td.dt{width:150px}td.dt input.late{color:var(--red);font-weight:700}
+td.lk div{display:flex;align-items:center}td.lk a{flex:none;width:28px;height:28px;display:grid;place-items:center;color:#0033cc;text-decoration:none;font-weight:700;border-radius:2px}td.lk a:hover{background:#dbe6f8;text-decoration:underline}
+tr.done td:not(.st) input:not([type=checkbox]),tr.done td textarea{color:#8a8a8a}
+td.act{width:32px}
+.empty{padding:40px 16px;text-align:center;color:var(--mute)}
+.addrow{all:unset;cursor:pointer;display:block;width:100%;padding:9px;color:#0033cc;text-align:center;font-size:13px;border-top:1px solid #f0efe8;background:#fff}
+.addrow:hover{text-decoration:underline;background:#f4f7fd}
+.note{font-size:12px;color:var(--mute);margin:10px 2px 0}
+/* barre d'état */
+.status{display:flex;gap:0;border-top:1px solid #d6d2c2;background:var(--face);font-size:12px}
+.status>span{padding:4px 10px;border-right:1px solid #c9c5b4;box-shadow:1px 0 #fff;display:flex;align-items:center;gap:6px}
+.status>span:last-child{margin-left:auto;border-right:0;box-shadow:none}
+.dot{width:9px;height:9px;border-radius:50%;background:#aaa;box-shadow:inset 0 2px rgb(255 255 255 / .5)}
+.dot.ok{background:#36b021}
+/* petites fenêtres */
+.pop{position:fixed;z-index:20;background:var(--face);border:1px solid #0831d9;border-radius:6px 6px 0 0;box-shadow:3px 3px 12px rgb(0 0 0 / .35);width:250px;display:none;overflow:hidden}
+.pop.open{display:block}
+.mini{height:24px;color:#fff;font:700 12px/24px Tahoma,sans-serif;padding:0 8px;text-shadow:1px 1px #0f1089;background:linear-gradient(#0997ff,#0053ee 10%,#0066ff 90%,#003dd7)}
+.pop .in{padding:10px}
+.pop label{display:block;font-size:12px;margin-bottom:4px}
+.pop select{width:100%;height:28px;font:inherit;font-size:13px;border:1px solid var(--edge);background:#fff;color:#000;margin-bottom:10px}
+.pop .row{display:flex;gap:6px;margin-bottom:6px}.pop .row .btn{flex:1;justify-content:center}
+.pop .danger{width:100%;justify-content:center}
+.toast{position:fixed;right:18px;bottom:18px;transform:translateY(160px);background:#ffffe1;color:#000;border:1px solid #000;padding:10px 14px;border-radius:7px;display:flex;gap:14px;align-items:center;transition:transform .25s ease;z-index:30;max-width:calc(100% - 36px);box-shadow:2px 2px 6px rgb(0 0 0 / .3);font-size:13px}
+.toast.show{transform:translateY(0)}
+.toast button{all:unset;cursor:pointer;color:#0033cc;text-decoration:underline}
+dialog{border:3px solid #0831d9;border-top:0;border-radius:8px 8px 0 0;padding:0;background:var(--face);color:#000;max-width:640px;width:calc(100% - 32px);box-shadow:0 14px 40px rgb(0 0 30 / .45)}
+dialog::backdrop{background:rgb(0 0 40 / .25)}
+dialog .tb{margin:0 -3px;height:30px}
+dialog .tb strong{flex:1;text-shadow:1px 1px #0f1089;font-size:14px}
+dialog .in{padding:12px}
+dialog textarea{width:100%;height:220px;font:12px/1.4 "Lucida Console",ui-monospace,monospace;border:1px solid var(--edge);padding:8px;background:#fff;color:#000}
+dialog .row{display:flex;gap:6px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media(max-width:600px){body{padding:8px 4px}.pct{margin-left:0;width:100%}.tools .btn{flex:1;justify-content:center}input[type=search],td input,td select,td textarea,.hd input{font-size:16px}.status>span:nth-child(2){display:none}}
+</style>
+</head>
+<body>
+<div class="win">
+  <div class="tb">
+    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M1 4h6l2 2h8v10H1z" fill="#f5c94a" stroke="#b8860b"/><path d="M1 7h16v9H1z" fill="#fde58a" stroke="#b8860b"/></svg>
+    <h1>Suivi des candidatures en alternance</h1>
+    <input id="title" aria-label="Titre du tableau" value="Mes candidatures en alternance">
+    <span class="ctl" aria-hidden="true"><span>_</span><span>□</span><span class="x">✕</span></span>
+  </div>
+  <div class="tools">
+    <button class="btn main" id="addRow"><svg class="i" viewBox="0 0 16 16"><path d="M3 1h7l3 3v11H3z" fill="#fff" stroke="#4a6fa5"/><path d="M8 6v6M5 9h6" stroke="#2c9a1e" stroke-width="2"/></svg>Nouvelle candidature</button>
+    <button class="btn" id="addCol"><svg class="i" viewBox="0 0 16 16"><path d="M2 2h12v12H2z" fill="#fff" stroke="#4a6fa5"/><path d="M6 2v12" stroke="#4a6fa5"/><path d="M10 6v6M7 9h6" stroke="#2c9a1e" stroke-width="2"/></svg>Colonne</button>
+    <button class="btn" id="exp"><svg class="i" viewBox="0 0 16 16"><path d="M2 3h12v10H2z" fill="#fde58a" stroke="#b8860b"/><path d="M8 5v6M5 8l3 3 3-3" stroke="#2262d8" stroke-width="1.6" fill="none"/></svg>Exporter / importer</button>
+    <div class="grow"><label for="q">Rechercher :</label><input type="search" id="q" placeholder="entreprise, poste, ville…"></div>
+  </div>
+  <div class="body">
+    <fieldset aria-label="Avancement par statut">
+      <legend>Avancement</legend>
+      <div class="track" id="track"></div>
+      <div class="legend" id="legend"></div>
+    </fieldset>
+    <div class="scroll"><table id="tbl"><thead></thead><tbody></tbody></table>
+      <button class="addrow" id="addRow2">+ Ajouter une candidature</button>
+    </div>
+    <p class="note">Les entreprises de départ sont fictives, c’est juste pour l’exemple : remplace-les par tes vraies candidatures. Une date de relance ou de RDV passée s’affiche en rouge tant que la candidature n’est ni acceptée ni refusée. Clique sur un nom de colonne pour le renommer, sur ⋯ pour changer son type ou la déplacer.</p>
+  </div>
+  <div class="status">
+    <span id="count"></span>
+    <span>Sauvegarde automatique activée</span>
+    <span class="sync"><span class="dot" id="dot"></span><span id="syncTxt">Enregistré sur cet appareil</span></span>
+  </div>
+</div>
+
+<div class="pop" id="pop" role="dialog" aria-label="Options de colonne">
+  <div class="mini">Propriétés de la colonne</div>
+  <div class="in">
+  <label for="popType">Type de colonne :</label>
+  <select id="popType">
+    <option value="text">Texte</option><option value="long">Texte long</option>
+    <option value="status">Statut</option><option value="date">Date</option>
+    <option value="link">Lien</option><option value="number">Nombre</option><option value="check">Case à cocher</option>
+  </select>
+  <div class="row"><button class="btn" data-mv="-1">← Gauche</button><button class="btn" data-mv="1">Droite →</button></div>
+  <button class="btn danger" id="popDel">Supprimer la colonne</button>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status"><span id="toastTxt"></span><button id="undo">Annuler</button></div>
+
+<dialog id="dlg">
+  <div class="tb"><strong>Exporter / importer</strong></div>
+  <div class="in">
+  <p style="margin:0 0 10px;font-size:13px">Copie le CSV pour le coller dans Excel ou Google Sheets, ou la sauvegarde complète (JSON) pour la recharger plus tard en la collant ici.</p>
+  <textarea id="io" aria-label="Données"></textarea>
+  <div class="row">
+    <button class="btn" id="showCsv">Voir CSV</button>
+    <button class="btn" id="showJson">Voir JSON</button>
+    <button class="btn" id="copy">Copier</button>
+    <button class="btn" id="imp">Importer le JSON collé</button>
+    <button class="btn main" id="close">OK</button>
+  </div>
+  <p id="ioMsg" style="margin:8px 0 0;font-size:13px;color:var(--mute)"></p>
+  </div>
+</dialog>
+
+<script>
+{
+const STATUS=[{v:'À postuler',c:'var(--grey)'},{v:'Envoyée',c:'var(--blue)'},{v:'Relancée',c:'var(--amber)'},{v:'Entretien',c:'var(--teal)'},{v:'Acceptée',c:'var(--green)',closed:1},{v:'Refusée',c:'var(--red)',closed:1}];
+const S0=STATUS[0].v;
+const isClosed=v=>!!(STATUS.find(s=>s.v===v)||{}).closed;
+const KEY='suivi-alternance-v1';
+const uid=()=>Math.random().toString(36).slice(2,9);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const iso=d=>d.toISOString().slice(0,10);
+const inDays=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
+
+const seed=()=>({title:'Mes candidatures en alternance',sort:null,cols:[
+  {id:'c1',name:'Entreprise',type:'text'},{id:'c2',name:'Poste',type:'text'},{id:'c3',name:'Statut',type:'status'},
+  {id:'c4',name:'Ville',type:'text'},{id:'c5',name:'Candidature le',type:'date'},{id:'c6',name:'Relance / RDV le',type:'date',alert:1},
+  {id:'c7',name:'Contact',type:'text'},{id:'c8',name:'Lien de l’offre',type:'link'},{id:'c9',name:'Notes',type:'long'}],
+ rows:[
+  {id:uid(),c1:'Agence Pixel Caraïbes',c2:'Alternant·e webdesigner',c3:'Entretien',c4:'Pointe-à-Pitre',c5:inDays(-14),c6:inDays(2),c7:'Responsable RH',c8:'',c9:'Préparer le portfolio et 2 projets à présenter'},
+  {id:uid(),c1:'Studio Karukera',c2:'Motion designer',c3:'Relancée',c4:'Baie-Mahault',c5:inDays(-12),c6:inDays(-1),c7:'',c8:'',c9:'Relancé par mail, pas de réponse'},
+  {id:uid(),c1:'Média Antilles',c2:'Chargé·e de communication digitale',c3:'Envoyée',c4:'Les Abymes',c5:inDays(-4),c6:inDays(6),c7:'',c8:'',c9:''},
+  {id:uid(),c1:'Web Agency 971',c2:'Développeur·se front-end',c3:'À postuler',c4:'Le Gosier',c5:'',c6:'',c7:'',c8:'',c9:'Adapter la lettre de motivation'},
+  {id:uid(),c1:'Imprimerie du Port',c2:'Graphiste PAO',c3:'Refusée',c4:'Jarry',c5:inDays(-25),c6:'',c7:'',c8:'',c9:'Poste déjà pourvu'}]});
+
+let S; try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+if(!S||!Array.isArray(S.cols))S=seed();
+let filter=null,query='',lastDeleted=null,db=null,ref=null,remoteStamp=0,writeT=null,popCol=null;
+
+const $=id=>document.getElementById(id);
+const thead=document.querySelector('#tbl thead'),tbody=document.querySelector('#tbl tbody');
+const statusCol=()=>S.cols.find(c=>c.type==='status');
+const today=iso(new Date());
+
+function cellHTML(r,c){
+  const v=r[c.id]??'',a=`data-r="${r.id}" data-c="${c.id}" aria-label="${esc(c.name)}"`;
+  if(c.type==='status'){const s=STATUS.find(x=>x.v===v)||STATUS[0];
+    return `<td class="st" style="--c:${s.c}"><select ${a}>${STATUS.map(x=>`<option${x.v===s.v?' selected':''}>${x.v}</option>`).join('')}</select></td>`}
+  if(c.type==='date'){const st=statusCol(),late=c.alert&&v&&v<=today&&!(st&&isClosed(r[st.id]));
+    return `<td class="dt"><input type="date" ${a} value="${esc(v)}"${late?' class="late" title="Date passée : pense à relancer"':''}></td>`}
+  if(c.type==='link'){const ok=/^https?:\/\//i.test(v);
+    return `<td class="lk"><div><input type="url" ${a} value="${esc(v)}" placeholder="https://…">${ok?`<a href="${esc(v)}" target="_blank" rel="noopener" aria-label="Ouvrir l’offre">↗</a>`:''}</div></td>`}
+  if(c.type==='number')return `<td><input type="number" step="any" ${a} value="${esc(v)}"></td>`;
+  if(c.type==='check')return `<td><input type="checkbox" ${a}${v?' checked':''}></td>`;
+  if(c.type==='long')return `<td><textarea rows="1" ${a}>${esc(v)}</textarea></td>`;
+  return `<td><input type="text" ${a} value="${esc(v)}"></td>`;
+}
+
+function visibleRows(){
+  const st=statusCol(),q=query.toLowerCase();
+  let rows=S.rows.filter(r=>(!filter||!st||(r[st.id]||S0)===filter)&&(!q||S.cols.some(c=>String(r[c.id]??'').toLowerCase().includes(q))));
+  if(S.sort){const c=S.cols.find(x=>x.id===S.sort.id);if(c){const d=S.sort.dir;
+    const key=r=>{const v=r[c.id];if(c.type==='status')return STATUS.findIndex(x=>x.v===v);if(c.type==='number')return v===''||v==null?Infinity:+v;if(c.type==='check')return v?1:0;return v?String(v).toLowerCase():'￿'};
+    rows=[...rows].sort((a,b)=>{const x=key(a),y=key(b);return (x<y?-1:x>y?1:0)*d})}}
+  return rows;
+}
+
+function render(){
+  $('title').value=S.title;
+  thead.innerHTML='<tr>'+S.cols.map(c=>{const on=S.sort&&S.sort.id===c.id;
+    return `<th><div class="hd"><input value="${esc(c.name)}" data-col="${c.id}" aria-label="Nom de colonne">
+    <button class="sorter${on?' on':''}" data-sort="${c.id}" aria-label="Trier">${on?(S.sort.dir>0?'↑':'↓'):'↕'}</button>
+    <button data-menu="${c.id}" aria-label="Options de la colonne">⋯</button></div></th>`}).join('')+'<th></th></tr>';
+  const rows=visibleRows(),st=statusCol();
+  tbody.innerHTML=rows.length?rows.map(r=>`<tr class="${st&&isClosed(r[st.id])?'done':''}">${S.cols.map(c=>cellHTML(r,c)).join('')}<td class="act"><button class="rowdel" data-del="${r.id}" aria-label="Supprimer la ligne">✕</button></td></tr>`).join('')
+    :`<tr><td colspan="${S.cols.length+1}" class="empty">${S.rows.length?'Aucune ligne ne correspond au filtre.':'Le tableau est vide. Ajoute une première ligne.'}</td></tr>`;
+  tbody.querySelectorAll('textarea').forEach(fit);
+  renderMetro();
+}
+
+function renderMetro(){
+  const st=statusCol(),n=S.rows.length;
+  $('count').textContent=n+(n>1?' lignes':' ligne');
+  if(!st){$('track').innerHTML='';$('legend').innerHTML='<span class="sub">Ajoute une colonne de type « Statut » pour voir l’avancement.</span>';return}
+  const counts=STATUS.map(s=>({...s,n:S.rows.filter(r=>(r[st.id]||S0)===s.v).length}));
+  $('track').innerHTML=n?counts.map(s=>`<span style="width:${s.n/n*100}%;background:${s.c}"></span>`).join(''):'';
+  const sent=S.rows.filter(r=>(r[st.id]||S0)!==S0).length;
+  const dc=S.cols.find(c=>c.type==='date'&&c.alert);
+  const due=dc?S.rows.filter(r=>r[dc.id]&&r[dc.id]<=today&&!isClosed(r[st.id])).length:0;
+  $('legend').innerHTML=counts.map(s=>`<button data-f="${s.v}" aria-pressed="${filter===s.v}" style="color:${s.c}"><i></i><span style="color:var(--ink)">${s.v}<b>${s.n}</b></span></button>`).join('')
+    +`<span class="pct">${sent} envoyée${sent>1?'s':''}${due?` · <span style="color:var(--red)">${due} à relancer</span>`:''}</span>`;
+}
+
+function fit(t){t.style.height='auto';t.style.height=Math.max(46,t.scrollHeight)+'px'}
+
+let pending=false;
+const hm=()=>new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+function flush(){if(!ref||!pending)return;clearTimeout(writeT);pending=false;
+  ref.set({json:JSON.stringify(S),stamp:S.stamp}).then(()=>{if(!pending)setSync(true)}).catch(()=>{pending=true;setSync(false,'Hors ligne — gardé sur cet appareil, nouvel essai…');setTimeout(flush,5000)})}
+function save(){
+  S.stamp=Date.now();
+  let local=true;try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){local=false}
+  if(ref){pending=true;$('dot').classList.remove('ok');$('syncTxt').textContent='Enregistrement…';clearTimeout(writeT);writeT=setTimeout(flush,500)}
+  else setSync(false,local?'Enregistré automatiquement à '+hm()+' (sur cet appareil)':'Connexion à la sauvegarde…');
+}
+function setSync(ok,txt){$('dot').classList.toggle('ok',ok);$('syncTxt').textContent=txt||(ok?'Enregistré automatiquement à '+hm():'Enregistré sur cet appareil')}
+addEventListener('pagehide',flush);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)flush()});
+document.addEventListener('focusout',()=>{if(pending)flush()});
+
+/* édition des cellules */
+tbody.addEventListener('input',e=>{const t=e.target,r=S.rows.find(x=>x.id===t.dataset.r);if(!r)return;
+  if(t.type==='checkbox')r[t.dataset.c]=t.checked;else r[t.dataset.c]=t.value;
+  if(t.tagName==='TEXTAREA')fit(t);
+  if(t.tagName==='SELECT'){const s=STATUS.find(x=>x.v===t.value);t.parentNode.style.setProperty('--c',s.c);render()}
+  else renderMetro();
+  save()});
+tbody.addEventListener('change',e=>{if(e.target.type==='date'){render()}});
+tbody.addEventListener('click',e=>{const b=e.target.closest('[data-del]');if(!b)return;
+  const i=S.rows.findIndex(r=>r.id===b.dataset.del);lastDeleted={kind:'row',item:S.rows[i],i};S.rows.splice(i,1);save();render();toast('Ligne supprimée')});
+
+/* en-têtes */
+thead.addEventListener('input',e=>{const c=S.cols.find(x=>x.id===e.target.dataset.col);if(c){c.name=e.target.value;save()}});
+thead.addEventListener('click',e=>{
+  const s=e.target.closest('[data-sort]');
+  if(s){const id=s.dataset.sort;S.sort=!S.sort||S.sort.id!==id?{id,dir:1}:S.sort.dir>0?{id,dir:-1}:null;save();render();return}
+  const m=e.target.closest('[data-menu]');if(m)openPop(m.dataset.menu,m)});
+
+function openPop(id,btn){popCol=id;const c=S.cols.find(x=>x.id===id);$('popType').value=c.type;
+  const r=btn.getBoundingClientRect(),p=$('pop');p.classList.add('open');
+  p.style.top=Math.min(r.bottom+6,innerHeight-p.offsetHeight-8)+'px';p.style.left=Math.max(8,Math.min(r.right-240,innerWidth-248))+'px';$('popType').focus()}
+function closePop(){$('pop').classList.remove('open');popCol=null}
+document.addEventListener('click',e=>{if(popCol&&!e.target.closest('#pop,[data-menu]'))closePop()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closePop()});
+addEventListener('scroll',closePop,{passive:true});
+$('popType').addEventListener('change',e=>{const c=S.cols.find(x=>x.id===popCol);c.type=e.target.value;
+  if(c.type==='status')S.rows.forEach(r=>{if(!STATUS.some(s=>s.v===r[c.id]))r[c.id]=S0});
+  save();render();closePop()});
+$('pop').addEventListener('click',e=>{const mv=e.target.closest('[data-mv]');if(!mv)return;
+  const i=S.cols.findIndex(c=>c.id===popCol),j=i+ +mv.dataset.mv;if(j<0||j>=S.cols.length)return;
+  [S.cols[i],S.cols[j]]=[S.cols[j],S.cols[i]];save();render();closePop()});
+$('popDel').addEventListener('click',()=>{const i=S.cols.findIndex(c=>c.id===popCol);const col=S.cols[i];
+  lastDeleted={kind:'col',item:col,i,vals:S.rows.map(r=>[r.id,r[col.id]])};S.cols.splice(i,1);S.rows.forEach(r=>delete r[col.id]);
+  if(S.sort&&S.sort.id===col.id)S.sort=null;closePop();save();render();toast('Colonne « '+col.name+' » supprimée')});
+
+/* ajout */
+const addRow=()=>{const r={id:uid()},st=statusCol();if(st)r[st.id]=filter||S0;S.rows.push(r);query='';$('q').value='';save();render();
+  const f=tbody.querySelector(`[data-r="${r.id}"]`);if(f){f.focus();f.scrollIntoView({block:'nearest'})}};
+$('addRow').onclick=addRow;$('addRow2').onclick=addRow;
+$('addCol').onclick=()=>{const c={id:'c'+uid(),name:'Nouvelle colonne',type:'text'};S.cols.push(c);save();render();
+  const i=thead.querySelector(`[data-col="${c.id}"]`);i.focus();i.select()};
+$('title').addEventListener('input',e=>{S.title=e.target.value;save()});
+$('q').addEventListener('input',e=>{query=e.target.value;render()});
+$('legend').addEventListener('click',e=>{const b=e.target.closest('[data-f]');if(!b)return;filter=filter===b.dataset.f?null:b.dataset.f;render()});
+
+/* annuler */
+let toastT;
+function toast(t){$('toastTxt').textContent=t;$('toast').classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>$('toast').classList.remove('show'),6000)}
+$('undo').onclick=()=>{if(!lastDeleted)return;const d=lastDeleted;
+  if(d.kind==='row')S.rows.splice(d.i,0,d.item);
+  else{S.cols.splice(d.i,0,d.item);d.vals.forEach(([id,v])=>{const r=S.rows.find(x=>x.id===id);if(r&&v!==undefined)r[d.item.id]=v})}
+  lastDeleted=null;save();render();$('toast').classList.remove('show')};
+
+/* export / import */
+const csvCell=v=>{v=v===true?'oui':v===false||v==null?'':String(v);return /[",;\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
+const toCsv=()=>[S.cols.map(c=>csvCell(c.name)).join(';'),...S.rows.map(r=>S.cols.map(c=>csvCell(r[c.id])).join(';'))].join('\n');
+$('exp').onclick=()=>{$('io').value=toCsv();$('ioMsg').textContent='';try{$('dlg').showModal()}catch(e){$('dlg').setAttribute('open','')}};
+$('showCsv').onclick=()=>{$('io').value=toCsv()};
+$('showJson').onclick=()=>{$('io').value=JSON.stringify(S,null,1)};
+$('close').onclick=()=>{try{$('dlg').close()}catch(e){$('dlg').removeAttribute('open')}};
+$('copy').onclick=async()=>{try{await navigator.clipboard.writeText($('io').value);$('ioMsg').textContent='Copié.'}catch(e){$('io').select();$('ioMsg').textContent='Sélectionné — fais Ctrl+C / Cmd+C.'}};
+$('imp').onclick=()=>{try{const d=JSON.parse($('io').value);if(!Array.isArray(d.cols)||!Array.isArray(d.rows))throw 0;
+  lastDeleted=null;S=d;save();render();$('ioMsg').textContent='Tableau importé.'}catch(e){$('ioMsg').textContent='Ce texte n’est pas une sauvegarde JSON valide de ce tableau.'}};
+
+render();
+
+/* synchronisation en ligne (si disponible) */
+(async()=>{try{
+  const w=window.claude;if(!w||!w.use)return;
+  db=await w.use('db');if(!db)return;
+  const doc=db.doc('tracker/alternance');
+  const read=s=>{const d=s&&typeof s.data==='function'?s.data():s;return d&&d.json?d:null};
+  let loaded=false;const timer=setTimeout(()=>{if(!loaded)setSync(false)},10000);
+  const apply=d=>{loaded=true;clearTimeout(timer);
+    if(!d){ref=doc;save();return}
+    if(d.stamp===S.stamp){ref=doc;setSync(true);return}
+    if(d.stamp>(S.stamp||0)&&d.stamp!==remoteStamp){remoteStamp=d.stamp;
+      try{const n=JSON.parse(d.json);if(Array.isArray(n.cols)){S=n;try{localStorage.setItem(KEY,d.json)}catch(e){}
+        if(!document.activeElement||!document.activeElement.closest('table,.tb'))render();else renderMetro()}}catch(e){}}
+    else if(!ref){ref=doc;save()}
+    ref=doc;if(!pending)setSync(true)};
+  if(doc.onSnapshot)doc.onSnapshot(s=>apply(read(s)),()=>setSync(false,'Non synchronisé — enregistré sur cet appareil'));
+  else apply(read(await doc.get()));
+}catch(e){setSync(false)}})();
+}
+</script>
+</body>
+</html>
